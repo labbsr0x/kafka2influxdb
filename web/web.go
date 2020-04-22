@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 
+	"github.com/labbsr0x/kafka2influxdb/database"
 	"github.com/labbsr0x/kafka2influxdb/web/config"
 	"github.com/labbsr0x/kafka2influxdb/web/controllers"
 
@@ -14,6 +15,7 @@ type Server struct {
 	*config.WebBuilder
 	app      *gin.Engine
 	consumer *controllers.ConsumerController
+	kafka    *database.DefaultKafka
 }
 
 // InitFromWebBuilder builds a Server instance
@@ -21,6 +23,7 @@ func (s *Server) InitFromWebBuilder(webBuilder *config.WebBuilder) *Server {
 	s.WebBuilder = webBuilder
 	s.app = gin.Default()
 	s.consumer = controllers.NewConsumerController(s.WebBuilder)
+	s.kafka = database.NewKafka(s.WebBuilder).Connect()
 
 	logLevel, err := logrus.ParseLevel(s.WebBuilder.LogLevel)
 	if err != nil {
@@ -40,6 +43,8 @@ func (s *Server) Run() {
 		consumerGroup.GET("/owner/:owner/thing/:thing/node/:node", s.consumer.GetHandler)
 		consumerGroup.POST("/owner/:owner/thing/:thing/node/:node", s.consumer.CreateHandler)
 	}
+
+	go s.kafka.Listen(s.consumer.ListenHandler)
 
 	s.app.Run("0.0.0.0:" + s.WebBuilder.Port)
 }

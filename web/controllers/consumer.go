@@ -25,6 +25,26 @@ func NewConsumerController(webBuilder *config.WebBuilder) *ConsumerController {
 	return instance
 }
 
+// ListenHandler saves a single node on influxdb
+func (c *ConsumerController) ListenHandler(message string) {
+	data := new(models.Data)
+	data.Tags = map[string]string{
+		"owner": "interactWS",
+		"thing": "kafka",
+		"node":  "message",
+	}
+	data.DateTime = time.Now()
+	data.Fields = map[string]string{
+		"message": message,
+	}
+
+	_, servErr := c.service.CreatePoint(data)
+	if !servErr.Ok() {
+		fmt.Sprintf("Error saving point: %s", servErr)
+		return
+	}
+}
+
 // CreateHandler saves a single node on influxdb
 func (c *ConsumerController) CreateHandler(ctx *gin.Context) {
 	var err error
