@@ -36,7 +36,6 @@ func (s *Server) InitFromWebBuilder(webBuilder *config.WebBuilder) *Server {
 }
 
 func (s *Server) Run() {
-	// This handler will match /invoice
 	consumerGroup := s.app.Group("/")
 	{
 		consumerGroup.GET("/", index)
@@ -44,7 +43,7 @@ func (s *Server) Run() {
 		consumerGroup.POST("/owner/:owner/thing/:thing/node/:node", s.consumer.CreateHandler)
 	}
 
-	go s.kafka.Listen(s.consumer.ListenHandler)
+	s.kafka.ListenGroup(s.consumer.ListenHandler)
 
 	s.app.Run("0.0.0.0:" + s.WebBuilder.Port)
 }

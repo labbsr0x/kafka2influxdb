@@ -11,7 +11,6 @@ import (
 const (
 	kafkaAddr        = "kafka-addr"
 	kafkaTopic       = "kafka-topic"
-	kafkaPartition   = "kafka-partition"
 	influxdbAddr     = "influxdb-addr"
 	influxdbName     = "influxdb-name"
 	influxdbUser     = "influxdb-user"
@@ -24,7 +23,6 @@ const (
 type Flags struct {
 	KafkaAddr        string
 	KafkaTopic       string
-	KafkaPartition   int
 	InfluxdbName     string
 	InfluxdbAddr     string
 	InfluxdbUser     string
@@ -42,7 +40,6 @@ type WebBuilder struct {
 func AddFlags(flags *pflag.FlagSet) {
 	flags.StringP(kafkaAddr, "k", "", "Kafka URL")
 	flags.StringP(kafkaTopic, "t", "/owner/*", "Kafka's topic")
-	flags.StringP(kafkaPartition, "", "0", "[optional] Kafka's partition. Default: 0")
 	flags.StringP(influxdbAddr, "i", "", "InfluxDB URL")
 	flags.StringP(influxdbName, "n", "interactws", "[optional] Sets the InfluxDB's name. Default: 'interactws'")
 	flags.StringP(influxdbUser, "u", "", "Sets the InfluxDB's user")
@@ -56,7 +53,6 @@ func (b *WebBuilder) Init(v *viper.Viper) *WebBuilder {
 	flags := new(Flags)
 	flags.KafkaAddr = v.GetString(kafkaAddr)
 	flags.KafkaTopic = v.GetString(kafkaTopic)
-	flags.KafkaPartition = v.GetInt(kafkaPartition)
 	flags.InfluxdbAddr = v.GetString(influxdbAddr)
 	flags.InfluxdbName = v.GetString(influxdbName)
 	flags.InfluxdbUser = v.GetString(influxdbUser)

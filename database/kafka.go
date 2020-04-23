@@ -1,13 +1,14 @@
 package database
 
 import (
-	"context"
 	"fmt"
-	"time"
+	"os"
+	"os/signal"
+	"strings"
 
 	"github.com/labbsr0x/kafka2influxdb/web/config"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/Shopify/sarama"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,9 +17,8 @@ type Kafka interface {
 	NewKafka(webBuilder *config.WebBuilder) *DefaultKafka
 	Connect() *DefaultKafka
 	Close() error
-	Consumer()
-	Produce(message string)
-	Reader(handler func(string)) error
+	ListenGroup(handler func(string))
+	consume(handler func(string)) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError)
 }
 
 // DefaultKafka a default Kafka interface implementation
@@ -27,7 +27,7 @@ type DefaultKafka struct {
 	Topic     string
 	Partition int
 	Messages  []string
-	Client    *kafka.Conn
+	Client    sarama.Consumer
 }
 
 // NewKafka initializes a default configs from web builder
@@ -35,81 +35,98 @@ func NewKafka(webBuilder *config.WebBuilder) *DefaultKafka {
 	instance := new(DefaultKafka)
 	instance.Addr = webBuilder.KafkaAddr
 	instance.Topic = webBuilder.KafkaTopic
-	instance.Partition = webBuilder.KafkaPartition
 
 	return instance
 }
 
 // Connect to Kafka
 func (dk *DefaultKafka) Connect() *DefaultKafka {
-	logrus.Debugf("Connecting to Kafka. Host: %s, Topic: %s, Partition: %s", dk.Addr, dk.Topic, dk.Partition)
+	config := sarama.NewConfig()
+	config.ClientID = "interactws-consumer"
+	config.Consumer.Return.Errors = true
 
-	conn, err := kafka.DialLeader(context.Background(), "tcp", dk.Addr, dk.Topic, dk.Partition)
+	client, err := sarama.NewConsumer([]string{dk.Addr}, config)
 	if err != nil {
-		logrus.Errorf("error connecting to Kafka: %s", err)
-		panic(fmt.Sprintf("No error should happen when connecting to Kafka, but got err=%+v", err))
+		logrus.Errorf("Error creating consumer client: %v", err)
+		panic(fmt.Sprintf("Error creating consumer client: %v", err))
 	}
 
-	dk.Client = conn
-	logrus.Debugf("connected to Kafka")
+	dk.Client = client
 
 	return dk
 }
 
-// Close all opened connections
-func (dk *DefaultKafka) Close() error {
-	return dk.Client.Close()
+// Listen all messages from Kafka topic list
+func (dk *DefaultKafka) ListenGroup(handler func(string)) {
+	defer func() {
+		if err := dk.Client.Close(); err != nil {
+			logrus.Errorf("Error on closing connection: %v", err)
+			panic(fmt.Sprintf("Error on closing connection: %v", err))
+		}
+	}()
+
+	consumer, errors := dk.consume(handler)
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+
+	// Count how many message processed
+	msgCount := 0
+
+	// Get signnal for finish
+	doneCh := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-consumer:
+				msgCount++
+			case consumerError := <-errors:
+				msgCount++
+				logrus.Debugf("Received consumerError\n\t Topic: %s, Partition: %s, Error: %v", string(consumerError.Topic), string(consumerError.Partition), consumerError.Err)
+				doneCh <- struct{}{}
+			case <-signals:
+				logrus.Debugf("Interrupt is detected")
+				doneCh <- struct{}{}
+			}
+		}
+	}()
+
+	<-doneCh
+	logrus.Debugf("Processed %d messages", msgCount)
 }
 
-// Consumer a Kafka topic
-func (dk *DefaultKafka) Consumer() {
-	dk.Messages = []string{}
-	dk.Client.SetReadDeadline(time.Now().Add(10 * time.Second))
-	batch := dk.Client.ReadBatch(10e3, 1e6) // fetch 10KB min, 1MB max
+func (dk *DefaultKafka) consume(handler func(string)) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError) {
+	consumers := make(chan *sarama.ConsumerMessage)
+	errors := make(chan *sarama.ConsumerError)
+	topics, _ := dk.Client.Topics()
 
-	b := make([]byte, 10e3) // 10KB max per message
-	for {
-		_, err := batch.Read(b)
-		if err != nil {
-			break
+	for _, topic := range topics {
+		if strings.Contains(topic, dk.Topic) {
+			partitions, _ := dk.Client.Partitions(topic)
+
+			for _, partition := range partitions {
+				consumer, err := dk.Client.ConsumePartition(topic, partition, sarama.OffsetOldest)
+				if nil != err {
+					logrus.Errorf("Topic %v partitions: %v", topic, err)
+					panic(fmt.Sprintf("Topic %v partitions: %v", topic, err))
+				}
+
+				go func(topic string, consumer sarama.PartitionConsumer) {
+					for {
+						select {
+						case consumerError := <-consumer.Errors():
+							errors <- consumerError
+
+						case msg := <-consumer.Messages():
+							consumers <- msg
+							logrus.Debugf("Got message on topic (%s): %s", topic, msg.Value)
+							handler(string(msg.Value))
+						}
+					}
+				}(topic, consumer)
+			}
 		}
-		fmt.Println(string(b))
-		dk.Messages = append(dk.Messages, string(b))
 	}
 
-	batch.Close()
-	dk.Client.Close()
-}
-
-// Produce a message in a Kafka topic
-func (dk *DefaultKafka) Produce(message string) {
-	dk.Client.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	dk.Client.WriteMessages(kafka.Message{Value: []byte(message)})
-	dk.Client.Close()
-}
-
-// Listen messages from Kafka topic
-func (dk *DefaultKafka) Listen(handler func(string)) error {
-	fmt.Sprintf("\n\tCreating Kafka reader with params\n. Host: %s, Topic: %s, Partition: %s", dk.Addr, dk.Topic, dk.Partition)
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   []string{dk.Addr},
-		Topic:     dk.Topic,
-		Partition: dk.Partition,
-		MinBytes:  10e3, // 10KB
-		MaxBytes:  10e6, // 10MB
-	})
-
-	for {
-		m, err := r.ReadMessage(context.Background())
-		if err != nil {
-			return err
-			break
-		}
-		fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
-		handler(string(m.Value))
-	}
-
-	r.Close()
-
-	return nil
+	return consumers, errors
 }
