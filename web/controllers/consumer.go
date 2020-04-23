@@ -67,6 +67,7 @@ func (c *ConsumerController) CreateHandler(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, err.Error())
 		return
 	} else {
+		data.Fields = json
 		_, servErr := c.service.CreatePoint(data)
 		if !servErr.Ok() {
 			ctx.String(servErr.SetStatusCode(), fmt.Sprintf("Error saving point: %s", servErr))
