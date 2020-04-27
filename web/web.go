@@ -43,12 +43,8 @@ func (s *Server) Run() {
 		consumerGroup.POST("/owner/:owner/thing/:thing/node/:node", s.consumer.CreateHandler)
 	}
 
-<<<<<<< HEAD
 	go s.kafka.ListenGroup(s.consumer.ListenHandler)
 
-=======
-	s.kafka.ListenGroup(s.consumer.ListenHandler)
->>>>>>> Decoding avro
 	s.app.Run("0.0.0.0:" + s.WebBuilder.Port)
 }
 
