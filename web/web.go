@@ -43,7 +43,7 @@ func (s *Server) Run() {
 		consumerGroup.POST("/owner/:owner/thing/:thing/node/:node", s.consumer.CreateHandler)
 	}
 
-	s.kafka.ListenGroup(s.consumer.ListenHandler)
+	go s.kafka.ListenGroup(s.consumer.ListenHandler)
 
 	s.app.Run("0.0.0.0:" + s.WebBuilder.Port)
 }
