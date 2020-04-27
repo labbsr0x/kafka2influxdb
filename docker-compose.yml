@@ -53,3 +53,11 @@ services:
       - KFK2INF_INFLUXDB_NAME=interactws
       - KFK2INF_INFLUXDB_USER=interactws-admin
       - KFK2INF_INFLUXDB_PASSWORD=interactws-admin
+  
+  local:
+    image: busybox
+    depends_on:
+      - zookeeper
+      - kafka
+      - influxdb
+      - kafka2influxdb
