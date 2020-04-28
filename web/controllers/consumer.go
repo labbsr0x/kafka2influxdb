@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/labbsr0x/kafka2influxdb/database/models"
@@ -11,6 +13,7 @@ import (
 	"github.com/labbsr0x/kafka2influxdb/web/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hamba/avro"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,23 +29,20 @@ func NewConsumerController(webBuilder *config.WebBuilder) *ConsumerController {
 }
 
 // ListenHandler saves a single node on influxdb
-func (c *ConsumerController) ListenHandler(message string) {
-	data := new(models.Data)
-	data.Tags = map[string]string{
-		"owner": "interactWS",
-		"thing": "kafka",
-		"node":  "message",
-	}
-	data.DateTime = time.Now()
-	data.Fields = map[string]string{
-		"message": message,
+func (c *ConsumerController) ListenHandler(payload []byte) error {
+	data, err := getData(payload)
+	if err != nil {
+		logrus.Errorf("Error binding JSON: %s", err)
+		return fmt.Errorf("Error binding JSON: %s", err)
 	}
 
 	_, servErr := c.service.CreatePoint(data)
 	if !servErr.Ok() {
-		fmt.Sprintf("Error saving point: %s", servErr)
-		return
+		logrus.Errorf("Error saving point: %s", servErr)
+		return fmt.Errorf("Error saving point: %s", servErr)
 	}
+
+	return nil
 }
 
 // CreateHandler saves a single node on influxdb
@@ -58,7 +58,7 @@ func (c *ConsumerController) CreateHandler(ctx *gin.Context) {
 
 	err = ctx.ShouldBindJSON(&json)
 	if err != nil {
-		fmt.Printf("Error binding JSON: %s", err)
+		logrus.Errorf("Error binding JSON: %s", err)
 		ctx.String(http.StatusBadRequest, "Error binding request body JSON. Err:", err)
 		return
 	}
@@ -90,14 +90,14 @@ func (c *ConsumerController) GetHandler(ctx *gin.Context) {
 
 	data.StartDateTime, data.EndDateTime, err = utils.ParsePeriodDateTime(ctx.Query("time"), ctx.Query("startDateTime"), ctx.Query("endDateTime"))
 	if err != nil {
-		fmt.Printf("%s", err)
+		logrus.Errorf("%s", err)
 		ctx.String(http.StatusBadRequest, fmt.Sprintf("Error parsing time interval query params: %s", err))
 		return
 	}
 
 	points, servErr := c.service.GetPoints(data)
 	if !servErr.Ok() {
-		fmt.Printf("%s", servErr)
+		logrus.Errorf("%s", servErr)
 		ctx.String(http.StatusBadRequest, fmt.Sprintf("Error getting data: %s", servErr))
 		return
 	}
@@ -122,4 +122,58 @@ func getDateTime(node map[string]string) (error, time.Time) {
 	delete(node, "dateTime")
 
 	return nil, dateTime
+}
+
+func getData(payload []byte) (data *models.Data, err error) {
+	var schemaModel avro.Schema
+	schema := models.Schema{}
+
+	schemaModel, err = avro.Parse(models.SchemaModel)
+	if err != nil {
+		logrus.Errorf("The schema could not be parsed: %v", err)
+		return
+	}
+
+	err = avro.Unmarshal(schemaModel, payload, &schema)
+	if err != nil {
+		err = json.Unmarshal(payload, &schema)
+		if err != nil {
+			logrus.Errorf("The message could not be decoded: %v", err)
+			return
+		}
+	}
+
+	logrus.Debugf("Schema parsed: %v", schema)
+
+	dateTime, err := time.Parse(time.RFC3339, schema.DateTime)
+	if err != nil {
+		logrus.Errorf("Error parsing dateTime attribute: %s", err)
+		return
+	}
+
+	data = new(models.Data)
+	data.DateTime = dateTime
+
+	rg := regexp.MustCompile(`owner/(?P<Owner>\w+)/thing/(?P<Thing>\w+)/node/(?P<Node>\w+)`)
+	if !rg.MatchString(schema.Key) {
+		err = fmt.Errorf("The keys doesn't matches with pattern (owner/:owner/thing/:thing/node/:node): %s", schema.Key)
+		logrus.Errorf("Error on parsing tags: %s", err)
+		return
+	}
+	keys := rg.FindStringSubmatch(schema.Key)
+
+	data.Tags = map[string]string{
+		"owner": keys[1],
+		"thing": keys[2],
+		"node":  keys[3],
+	}
+
+	data.Fields = map[string]string{
+		"lat":  schema.Lat,
+		"lon":  schema.Lon,
+		"mci":  schema.Mci,
+		"type": schema.Type,
+	}
+
+	return
 }
