@@ -41,15 +41,6 @@ type Schema struct {
 	Mci      string `avro:"mci"`
 }
 
-type SchemaJson struct {
-	Key      string `json:"key"`
-	DateTime string `json:"dateTime"`
-	Lat      string `json:"lat"`
-	Lon      string `json:"lon"`
-	Type     string `json:"type"`
-	Mci      string `json:"mci"`
-}
-
 type SchemaData struct {
 	DateTime string `avro:"dateTime"`
 	Lat      string `avro:"lat"`
