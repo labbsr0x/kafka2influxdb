@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -11,8 +12,8 @@ import (
 	"github.com/labbsr0x/kafka2influxdb/web/services"
 	"github.com/labbsr0x/kafka2influxdb/web/utils"
 
-	avro "github.com/elodina/go-avro"
 	"github.com/gin-gonic/gin"
+	"github.com/hamba/avro"
 	"github.com/sirupsen/logrus"
 )
 
@@ -124,22 +125,36 @@ func getDateTime(node map[string]string) (error, time.Time) {
 }
 
 func getData(payload []byte) (data *models.Data, err error) {
-	schemaModel, err := avro.ParseSchema(models.SchemaModel)
+	var schemaModel avro.Schema
+	schema := models.Schema{}
+	schemaJson := models.SchemaJson{}
+
+	err = json.Unmarshal(payload, &schemaJson)
 	if err != nil {
-		logrus.Errorf("The schema could not be parsed: %v", err)
-		return
+		logrus.Errorf("The message could not be decoded as json: %v", err)
+	} else {
+		schema.Key = schemaJson.Key
+		schema.DateTime = schemaJson.DateTime
+		schema.Lat = schemaJson.Lat
+		schema.Lon = schemaJson.Lon
+		schema.Mci = schemaJson.Mci
+		schema.Type = schemaJson.Type
 	}
 
-	reader := avro.NewSpecificDatumReader()
-	reader.SetSchema(schemaModel)
+	if (models.SchemaJson{}) == schemaJson {
+		schemaModel, err = avro.Parse(models.SchemaModel)
+		if err != nil {
+			logrus.Errorf("The schema could not be parsed: %v", err)
+			return
+		}
 
-	decoder := avro.NewBinaryDecoder(payload)
-	schema := new(models.Schema)
-	err = reader.Read(schema, decoder)
-	if err != nil {
-		logrus.Errorf("The message could not be decoded: %v", err)
-		return
+		err = avro.Unmarshal(schemaModel, payload, &schema)
+		if err != nil {
+			logrus.Errorf("The message could not be decoded: %v", err)
+			return
+		}
 	}
+
 	logrus.Debugf("Schema parsed: %v", schema)
 
 	dateTime, err := time.Parse(time.RFC3339, schema.DateTime)
@@ -147,6 +162,8 @@ func getData(payload []byte) (data *models.Data, err error) {
 		logrus.Errorf("Error parsing dateTime attribute: %s", err)
 		return
 	}
+
+	data = new(models.Data)
 	data.DateTime = dateTime
 
 	rg := regexp.MustCompile(`owner/(?P<Owner>\w+)/thing/(?P<Thing>\w+)/node/(?P<Node>\w+)`)
