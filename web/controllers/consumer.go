@@ -127,28 +127,16 @@ func getDateTime(node map[string]string) (error, time.Time) {
 func getData(payload []byte) (data *models.Data, err error) {
 	var schemaModel avro.Schema
 	schema := models.Schema{}
-	schemaJson := models.SchemaJson{}
 
-	err = json.Unmarshal(payload, &schemaJson)
+	schemaModel, err = avro.Parse(models.SchemaModel)
 	if err != nil {
-		logrus.Errorf("The message could not be decoded as json: %v", err)
-	} else {
-		schema.Key = schemaJson.Key
-		schema.DateTime = schemaJson.DateTime
-		schema.Lat = schemaJson.Lat
-		schema.Lon = schemaJson.Lon
-		schema.Mci = schemaJson.Mci
-		schema.Type = schemaJson.Type
+		logrus.Errorf("The schema could not be parsed: %v", err)
+		return
 	}
 
-	if (models.SchemaJson{}) == schemaJson {
-		schemaModel, err = avro.Parse(models.SchemaModel)
-		if err != nil {
-			logrus.Errorf("The schema could not be parsed: %v", err)
-			return
-		}
-
-		err = avro.Unmarshal(schemaModel, payload, &schema)
+	err = avro.Unmarshal(schemaModel, payload, &schema)
+	if err != nil {
+		err = json.Unmarshal(payload, &schema)
 		if err != nil {
 			logrus.Errorf("The message could not be decoded: %v", err)
 			return
