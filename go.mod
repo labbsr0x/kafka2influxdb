@@ -5,10 +5,10 @@ go 1.13
 require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/gin-gonic/gin v1.6.2
+	github.com/hamba/avro v1.0.0
 	github.com/huandu/go-sqlbuilder v1.7.0
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/pelletier/go-toml v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/afero v1.2.2 // indirect
