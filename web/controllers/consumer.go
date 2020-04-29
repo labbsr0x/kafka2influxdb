@@ -117,7 +117,7 @@ func getDateTime(node map[string]string) (error, time.Time) {
 	dateTime, err := time.Parse(time.RFC3339, dateTimeString)
 	if err != nil {
 		logrus.Errorf("Error parsing dateTime attribute: %s", err)
-		return fmt.Errorf("You must provide a `dateTime` field in the RFC3339 format (Ex: 2019-06-24T14:27:33Z)"), time.Time{}
+		return fmt.Errorf("You must provide a `dateTime` field in the RFC3339 format (Ex: 2020-05-24T14:27:33Z)"), time.Time{}
 	}
 	delete(node, "dateTime")
 
