@@ -9,13 +9,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-    - uses: Mushus/golangci-linter@v1
-    - name: Lint
-    - uses: actions/checkout@master
+    steps:  
+    - uses: actions/checkout@master 
+ 
+    - name: GolangCI-Linter
+      uses: Mushus/golangci-linter@v1.1.2  
+      
     - name: Publish to Docker Repository
       uses: labbsr0x/kafka2influxdb@master
       with:
           name: gabrieldossantos/kafka2influxdb
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+
