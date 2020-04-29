@@ -1,44 +1,49 @@
 package models
 
 var SchemaModel = `{
-    "name": "movbb",
-    "type": "record",
-    "namespace": "interactws",
-    "fields": [
-      {
-        "name": "key",
-        "type": "string"
-      },
-      {
-        "name": "dateTime",
-        "type": "string"
-      },
-      {
-        "name": "lat",
-        "type": "string"
-      },
-      {
-        "name": "lon",
-        "type": "string"
-      },
-      {
-        "name": "type",
-        "type": "string"
-      },
-      {
-        "name": "mci",
-        "type": "string"
+  "name": "movbb",
+  "type": "record",
+  "namespace": "br.com.bb.interactws",
+  "fields": [
+    {
+      "name": "key",
+      "type": "string"
+    },
+    {
+      "name": "value",
+      "type": {
+        "name": "value",
+        "type": "record",
+        "fields": [
+          {
+            "name": "dateTime",
+            "type": "string"
+          },
+          {
+            "name": "lat",
+            "type": "string"
+          },
+          {
+            "name": "lon",
+            "type": "string"
+          },
+          {
+            "name": "mci",
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "type": "string"
+          }
+        ]
       }
-    ]
-  }`
+    }
+  ]
+}`
 
 type Schema struct {
-	Key      string `avro:"key"`
-	DateTime string `avro:"dateTime"`
-	Lat      string `avro:"lat"`
-	Lon      string `avro:"lon"`
-	Type     string `avro:"type"`
-	Mci      string `avro:"mci"`
+	Key   string     `avro:"key"`
+	Value SchemaData `avro:"value"`
 }
 
 type SchemaData struct {
