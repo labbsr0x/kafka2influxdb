@@ -36,7 +36,7 @@ services:
       - INFLUXDB_HTTP_AUTH_ENABLED=true
 
   kafka2influxdb:
-    image: interactws/kafka2influxdb
+    image: gabrieldossantos/kafka2influxdb
     build: .
     restart: always
     depends_on:
