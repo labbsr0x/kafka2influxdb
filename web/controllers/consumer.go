@@ -125,42 +125,51 @@ func getDateTime(node map[string]string) (error, time.Time) {
 }
 
 func getData(payload []byte) (data *models.Data, err error) {
-	var schemaModel avro.Schema
-	schema := models.Schema{}
+	var schema avro.Schema
+	var dateTime time.Time
+	record := models.Schema{}
+	retry := true
 
-	schemaModel, err = avro.Parse(models.SchemaModel)
+	schema, err = avro.Parse(models.SchemaModel)
 	if err != nil {
 		logrus.Errorf("The schema could not be parsed: %v", err)
-		return
 	}
 
-	err = avro.Unmarshal(schemaModel, payload, &schema)
+	err = avro.Unmarshal(schema, payload, &record)
 	if err != nil {
-		err = json.Unmarshal(payload, &schema)
+		err = json.Unmarshal(payload, &record) //Try decoding as json when avro fails
 		if err != nil {
 			logrus.Errorf("The message could not be decoded: %v", err)
 			return
 		}
 	}
 
-	logrus.Debugf("Schema parsed: %v", schema)
+	logrus.Debugf("Record parsed: %v", record)
 
-	dateTime, err := time.Parse(time.RFC3339, schema.DateTime)
-	if err != nil {
-		logrus.Errorf("Error parsing dateTime attribute: %s", err)
-		return
+	for retry {
+		dateTime, err = time.Parse(time.RFC3339, record.Value.DateTime)
+		if err != nil {
+			err = json.Unmarshal(payload, &record) //Try decoding as json when couldn`t parse dateTime
+			if err != nil {
+				retry = false
+				logrus.Errorf("Error parsing dateTime attribute: %s", err)
+				return
+			}
+		} else {
+			retry = false
+		}
 	}
 
 	data = new(models.Data)
 	data.DateTime = dateTime
 
 	rg := regexp.MustCompile(`owner/(?P<Owner>\w+)/thing/(?P<Thing>\w+)/node/(?P<Node>\w+)`)
-	if !rg.MatchString(schema.Key) {
-		err = fmt.Errorf("The keys doesn't matches with pattern (owner/:owner/thing/:thing/node/:node): %s", schema.Key)
+	if !rg.MatchString(record.Key) {
+		err = fmt.Errorf("The keys doesn't matches with pattern (owner/:owner/thing/:thing/node/:node): %s", record.Key)
 		logrus.Errorf("Error on parsing tags: %s", err)
 		return
 	}
-	keys := rg.FindStringSubmatch(schema.Key)
+	keys := rg.FindStringSubmatch(record.Key)
 
 	data.Tags = map[string]string{
 		"owner": keys[1],
@@ -169,10 +178,10 @@ func getData(payload []byte) (data *models.Data, err error) {
 	}
 
 	data.Fields = map[string]string{
-		"lat":  schema.Lat,
-		"lon":  schema.Lon,
-		"mci":  schema.Mci,
-		"type": schema.Type,
+		"lat":  record.Value.Lat,
+		"lon":  record.Value.Lon,
+		"mci":  record.Value.Mci,
+		"type": record.Value.Type,
 	}
 
 	return
