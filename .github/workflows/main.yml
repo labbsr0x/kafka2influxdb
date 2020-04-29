@@ -12,8 +12,8 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: Publish to Docker Repository
-    uses: labbsr0x/kafka2influxdb@master
-    with:
-        name: gabrieldossantos/kafka2influxdb
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      uses: labbsr0x/kafka2influxdb@master
+      with:
+          name: gabrieldossantos/kafka2influxdb
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
