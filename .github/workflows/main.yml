@@ -18,8 +18,15 @@ jobs:
     - name: Publish to Docker Repository
       uses: labbsr0x/kafka2influxdb@master
       with:
-          name: gabrieldossantos/kafka2influxdb
+          name: labbsr0x/kafka2influxdb
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
+      env:
+        KFK2INF_PORT: 8000
+        KFK2INF_KAFKA_ADDR: localhost:9092
+        KFK2INF_KAFKA_TOPIC: owner
+        KFK2INF_INFLUXDB_ADDR: http://localhost:8086
+        KFK2INF_INFLUXDB_NAME: interactws
+        KFK2INF_INFLUXDB_USER: ${{ secrets.INFLUX_USERNAME }}
+        KFK2INF_INFLUXDB_PASSWORD: ${{ secrets.INFLUX_PASSWORD }}
 
