@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       env:
         KFK2INF_PORT: 8000
-        KFK2INF_KAFKA_ADDR: tcp://localhost:9092
+        KFK2INF_KAFKA_ADDR: kafka:29092
         KFK2INF_KAFKA_TOPIC: owner
         KFK2INF_INFLUXDB_ADDR: http://localhost:8086
         KFK2INF_INFLUXDB_NAME: interactws
