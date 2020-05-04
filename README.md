@@ -137,32 +137,18 @@ $ curl --request POST \
   --url http://localhost:8000/owner/movbb/thing/297145674599/node/location \
   --header 'content-type: application/json' \
   --data '{
-    "key":"owner/movbb/thing/297145674599/node/location",
-    "value":{
         "dateTime":"2020-04-08T00:04:08Z",
         "lat":"-5.5222581",
         "lon":"-47.4573297",
         "mci":"297145674599",
         "type":"gps"
-    }
-}'
+  }'
 ```
 
 #### Result
 
 ```sh
-$ {
-    "owner": "movbb",
-    "thing": "297145674599",
-    "node": "location",
-    "attributes": {
-      "lat": "-5.5222581",
-      "lon": "-47.4573297",
-      "mci": "297145674599",
-      "type": "gps"
-    },
-    "dateTime": "2020-04-08T00:04:08Z"
-  }
+$ State point created
 ```
 
 ### Installation
