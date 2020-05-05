@@ -53,7 +53,8 @@ services:
       - KFK2INF_INFLUXDB_NAME=interactws
       - KFK2INF_INFLUXDB_USER=interactws-admin
       - KFK2INF_INFLUXDB_PASSWORD=interactws-admin
-  
+      - KFK2INF_WITH_SASL=false
+
   local:
     image: busybox
     depends_on:

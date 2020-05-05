@@ -3,7 +3,8 @@ module github.com/labbsr0x/kafka2influxdb
 go 1.13
 
 require (
-	github.com/Shopify/sarama v1.26.1
+	github.com/Shopify/sarama v1.23.1
+	github.com/docker/docker v1.13.1
 	github.com/gin-gonic/gin v1.6.2
 	github.com/hamba/avro v1.0.0
 	github.com/huandu/go-sqlbuilder v1.7.0

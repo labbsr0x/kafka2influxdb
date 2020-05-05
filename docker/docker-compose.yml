@@ -1,0 +1,133 @@
+version: '3.6'
+
+services:
+    kafka2influxdb:
+        image: labbsr0x/kafka2influxdb
+        hostname: kafka2influx
+        container_name: kafka2influx
+        build: ../.
+        restart: always
+        ports:
+            - 8000:8000
+        environment: 
+            - KFK2INF_PORT=8000
+            - KFK2INF_KAFKA_ADDR=broker:9093
+            - KFK2INF_KAFKA_TOPIC=owner
+            - KFK2INF_INFLUXDB_ADDR=http://influxdb:8086
+            - KFK2INF_INFLUXDB_NAME=interactws
+            - KFK2INF_INFLUXDB_USER=interactws-admin
+            - KFK2INF_INFLUXDB_PASSWORD=interactws-admin
+            - KFK2INF_WITH_SASL=true  
+            - KFK2INF_KERBEROS_CONFIG_PATH=/krb5.conf
+            - KFK2INF_KERBEROS_SERVICE_NAME=kafka
+            - KFK2INF_KERBEROS_USERNAME=kafka/kafka2influx
+            - KFK2INF_KERBEROS_PASSWORD=kafka2influx1234
+            - KFK2INF_KERBEROS_REALM=KERBEROS
+        volumes:
+            - ./kerberos-data/krb5.conf:/krb5.conf
+
+    kerberos: 
+        image: jairsjunior/kerberos-docker:0.0.3
+        hostname: kerberos
+        container_name: kerberos
+        ports:
+            - 88:88
+        environment: 
+            - REALM=KERBEROS
+            - DOMAIN_REALM=kerberos
+            - KERB_MASTER_KEY=masterkey
+            - KERB_ADMIN_USER=admin
+            - KERB_ADMIN_PASS=admin
+            - SEARCH_DOMAINS=search.consul kerberos
+        volumes: 
+            - ./kerberos-data:/volumes/kerberos
+            - ./kerberos-keytabs:/volumes/keytabs
+            - ./kerberos-users:/volumes/users
+
+    zookeeper:
+        image: confluentinc/cp-zookeeper:5.3.1
+        hostname: zookeeper
+        container_name: zookeeper
+        ports:
+            - 2181:2181
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+            KAFKA_OPTS: "-Djava.security.auth.login.config=/tmp/kafka_client_jaas.conf -Djava.security.krb5.conf=/etc/kafka/krb5.conf "
+        volumes:
+            - ./kerberos-keytabs/kafka_client1.keytab:/tmp/kafka_client1.keytab
+            - ./kafka-jaas/kafka_client_jaas.conf:/tmp/kafka_client_jaas.conf
+            - ./kafka-jaas/producer.properties:/tmp/producer.properties
+            - ./kafka-jaas/consumer.properties:/tmp/consumer.properties
+            - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
+
+    broker:
+        image: confluentinc/cp-kafka:5.3.1
+        hostname: broker
+        container_name: broker
+        depends_on:
+            - zookeeper
+        ports:
+            - 29092:29092
+            - 9092:9092
+            - 9093:9093
+        environment:
+            #BASE CONFLUENT ENVIRONMENTS
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
+            CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+            CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+            CONFLUENT_METRICS_ENABLE: 'true'
+            CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+            #KAFKA SASL SET HANDLER
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT
+            KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,SASL_PLAINTEXT://0.0.0.0:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092,SASL_PLAINTEXT://broker:9093
+            KAFKA_SASL_KERBEROS_SERVICE_NAME: kafka
+            KAFKA_SASL_ENABLED_MECHANISMS: GSSAPI
+            KAFKA_LOG_RETENTION_MS: 259200000
+            #KAKFA JAAS CONFIGURATION FILE
+            KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf -Djava.security.krb5.conf=/etc/kafka/krb5.conf "
+            ZOOKEEPER_SASL_ENABLED: "FALSE"
+            #KAFKA INTERBROKER SECURITY
+            KAFKA_SECURITY_INTER_BROKER_PROTOCOL: PLAINTEXT
+            KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+            KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,org.apache.kafka=INFO"
+            KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+            ############## Authorizer ######################
+            KAFKA_AUTHORIZER_CLASS_NAME: "kafka.security.auth.SimpleAclAuthorizer"
+            KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+            # Access denials are logged at INFO level, change to DEBUG to also log allowed accesses
+            KAFKA_LOG4J_LOGGER_KAFKA_AUTHORIZER_LOGGER: "DEBUG, authorizerAppender"
+            KAFKA_LOG4J_ADDITIVITY_KAFKA_AUTHORIZER_LOGGER: "false"
+        volumes:
+            - ./kafka-jaas/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+            - ./kerberos-keytabs/kafka_broker.keytab:/etc/security/keytabs/kafka_broker.keytab
+            - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
+    
+    kafka-ui:
+        image: obsidiandynamics/kafdrop
+        ports: 
+            - 9000:9000
+        environment: 
+            - KAFKA_BROKERCONNECT=broker:29092
+            - JVM_OPTS=-Xms32M -Xmx64M
+            - SERVER_SERVLET_CONTEXTPATH=/ 
+
+    influxdb:
+        image: influxdb:1.7
+        restart: always
+        ports:
+            - 8086:8086
+        environment:
+            - INFLUXDB_ADMIN_USER=interactws-admin
+            - INFLUXDB_ADMIN_PASSWORD=interactws-admin
+            - INFLUXDB_DB=interactws
+            - INFLUXDB_USER=interactws
+            - INFLUXDB_PASSWORD=interactws
+            - INFLUXDB_HTTP_AUTH_ENABLED=true
+
+    

@@ -23,11 +23,17 @@ type Kafka interface {
 
 // DefaultKafka a default Kafka interface implementation
 type DefaultKafka struct {
-	Addr      string
-	Topic     string
-	Partition int
-	Messages  []string
-	Client    sarama.Consumer
+	Addr                string
+	Topic               string
+	Partition           int
+	Messages            []string
+	Client              sarama.Consumer
+	WithSASL            bool
+	KerberosConfigPath  string
+	KerberosServiceName string
+	KerberosUsername    string
+	KerberosPassword    string
+	KerberosRealm       string
 }
 
 // NewKafka initializes a default configs from web builder
@@ -35,6 +41,12 @@ func NewKafka(webBuilder *config.WebBuilder) *DefaultKafka {
 	instance := new(DefaultKafka)
 	instance.Addr = webBuilder.KafkaAddr
 	instance.Topic = webBuilder.KafkaTopic
+	instance.WithSASL = webBuilder.WithSASL
+	instance.KerberosConfigPath = webBuilder.KerberosConfigPath
+	instance.KerberosServiceName = webBuilder.KerberosServiceName
+	instance.KerberosUsername = webBuilder.KerberosUsername
+	instance.KerberosPassword = webBuilder.KerberosPassword
+	instance.KerberosRealm = webBuilder.KerberosRealm
 
 	return instance
 }
@@ -44,6 +56,27 @@ func (dk *DefaultKafka) Connect() *DefaultKafka {
 	config := sarama.NewConfig()
 	config.ClientID = "interactws-consumer"
 	config.Consumer.Return.Errors = true
+
+	//Check if SASL is enabled
+	if dk.WithSASL {
+		config.Version = sarama.V2_3_0_0
+		config.Net.SASL.Enable = dk.WithSASL
+		config.Net.SASL.Handshake = true
+		config.Net.SASL.Mechanism = sarama.SASLTypeGSSAPI
+		config.Net.SASL.GSSAPI = sarama.GSSAPIConfig{
+			AuthType:           sarama.KRB5_USER_AUTH,
+			KerberosConfigPath: dk.KerberosConfigPath,
+			ServiceName:        dk.KerberosServiceName,
+			Username:           dk.KerberosUsername,
+			Password:           dk.KerberosPassword,
+			Realm:              dk.KerberosRealm,
+		}
+	}
+
+	// For debug SASL_PLAINTEXT USING KERBEROS
+	// saramaBroker := sarama.NewBroker(dk.Addr)
+	// saramaBroker.Open(config)
+	// fmt.Println(saramaBroker.Connected())
 
 	client, err := sarama.NewConsumer([]string{dk.Addr}, config)
 	if err != nil {
