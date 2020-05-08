@@ -167,16 +167,24 @@ $ go build
 Some parameters are required to running the api, these parameters can be passed via the command line or environment variables as described below
 
 
-| ENV                       | Command | Required | Default  | Description                                        |
-|---------------------------|---------|----------|----------|----------------------------------------------------|
-| KFK2INF_PORT              | -p      | false    | 7070     | Api service port                                   |
-| KFK2INF_KAFKA_ADDR        | -k      | true     | null     | Kafka host address                                 |
-| KFK2INF_KAFKA_TOPIC       | -t      | true     | /owner/* | Kafka topic (wildcard)                             |
-| KFK2INF_INFLUXDB_ADDR     | -i      | true     | null     | InfluxDB host address                              |
-| KFK2INF_INFLUXDB_NAME     | -n      | true     | null     | InfluxDB database name                             |
-| KFK2INF_INFLUXDB_USER     | -u      | true     | null     | InfluxDB username                                  |
-| KFK2INF_INFLUXDB_PASSWORD | -s      | true     | null     | InfluxDB password                                  |
-| KFK2INF_LOG_LEVEL         | -l      | false    | info     | Log level (debug, info, warn, error, fatal, panic) |
+| ENV                           | Command | Required | Default  | Description                                        |
+|-------------------------------|---------|----------|----------|----------------------------------------------------|
+| KFK2INF_PORT                  | -p      | false    | 7070     | Api service port                                   |
+| KFK2INF_KAFKA_ADDR            | -k      | true     | null     | Kafka host address                                 |
+| KFK2INF_KAFKA_TOPIC           | -t      | true     | /owner/* | Kafka topic (wildcard)                             |
+| KFK2INF_KAFKA_SCHEMA_REGISTRY | -e      | true     | null     | Kafka schema registry                              |
+| KFK2INF_INFLUXDB_ADDR         | -i      | true     | null     | InfluxDB host address                              |
+| KFK2INF_INFLUXDB_ADDR         | -i      | true     | null     | InfluxDB host address                              |
+| KFK2INF_INFLUXDB_NAME         | -n      | true     | null     | InfluxDB database name                             |
+| KFK2INF_INFLUXDB_USER         | -u      | true     | null     | InfluxDB username                                  |
+| KFK2INF_INFLUXDB_PASSWORD     | -s      | true     | null     | InfluxDB password                                  |
+| KFK2INF_LOG_LEVEL             | -l      | false    | info     | Log level (debug, info, warn, error, fatal, panic) |
+| KFK2INF_WITH_SASL             | -w      | false    | false    | Enable/Disable SASL Kafka Security.                |
+| KFK2INF_KERBEROS_CONFIG_PATH  | -c      | true     | null     | Kerberos config path                               |
+| KFK2INF_KERBEROS_SERVICE_NAME | -d      | true     | null     | Kerberos service name                              |
+| KFK2INF_KERBEROS_USERNAME     | -f      | true     | null     | Kerberos username                                  |
+| KFK2INF_KERBEROS_PASSWORD     | -g      | true     | null     | Kerberos password                                  |
+| KFK2INF_KERBEROS_REALM        | -r      | false    | KERBEROS | Kerberos realm                                     |
 
 
 ## How to run
@@ -187,7 +195,19 @@ Run in localhost
 
 ```sh
 $ cd kafka2influxdb
-$ go run . serve -p=8000 -k=localhost:9092 -i=http://localhost:8086 -n=influxdbName -u=influxdbUser -s=influxdbPassword -t=topicName -l=debug
+$ go run . serve \
+-p=8000 \
+-k=localhost:9092 \
+-e=localhost:8081 \
+-t=owner \
+-i=http://localhost:8086 \
+-n=influxdbName \
+-u=influxdbUser \
+-s=influxdbPassword \
+-c=/krb5.conf \
+-f=kerberosUser \
+-g=kerberosPassword \
+-l=debug
 ```
 
 For production environments
@@ -196,11 +216,15 @@ For production environments
 $ go run . serve
 $ ENV KFK2INF_PORT="8000"
 $ ENV KFK2INF_KAFKA_ADDR="localhost:9092"
+$ ENV KFK2INF_KAFKA_SCHEMA_REGISTRY="localhost:8081"
 $ ENV KFK2INF_KAFKA_TOPIC="topicName"
 $ ENV KFK2INF_INFLUXDB_ADDR="http://localhost:8086"
 $ ENV KFK2INF_INFLUXDB_NAME="influxdbName"
 $ ENV KFK2INF_INFLUXDB_USER="influxdbUser"
 $ ENV KFK2INF_INFLUXDB_PASSWORD="influxdbPassword"
+$ ENV KFK2INF_KERBEROS_CONFIG_PATH="/krb5.conf"
+$ ENV KFK2INF_KERBEROS_USERNAME="kerberosUser"
+$ ENV KFK2INF_KERBEROS_PASSWORD="kerberosPassword"
 ```
 
 

@@ -17,4 +17,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.3
+	github.com/valyala/fasthttp v1.12.0
+	gopkg.in/jcmturner/goidentity.v3 v3.0.0 // indirect
 )

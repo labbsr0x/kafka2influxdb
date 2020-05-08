@@ -13,6 +13,7 @@ services:
             - KFK2INF_PORT=8000
             - KFK2INF_KAFKA_ADDR=broker:9093
             - KFK2INF_KAFKA_TOPIC=owner
+            - KFK2INF_KAFKA_SCHEMA_REGISTRY=broker:8081
             - KFK2INF_INFLUXDB_ADDR=http://influxdb:8086
             - KFK2INF_INFLUXDB_NAME=interactws
             - KFK2INF_INFLUXDB_USER=interactws-admin
@@ -108,6 +109,19 @@ services:
             - ./kerberos-keytabs/kafka_broker.keytab:/etc/security/keytabs/kafka_broker.keytab
             - ./kerberos-data/krb5.conf:/etc/kafka/krb5.conf
     
+    schema-registry:
+        image: confluentinc/cp-schema-registry:5.3.1
+        hostname: schema-registry
+        container_name: schema-registry
+        depends_on:
+            - zookeeper
+            - broker
+        ports:
+            - "8081:8081"
+        environment:
+            SCHEMA_REGISTRY_HOST_NAME: schema-registry
+            SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+    
     kafka-ui:
         image: obsidiandynamics/kafdrop
         ports: 
@@ -129,5 +143,3 @@ services:
             - INFLUXDB_USER=interactws
             - INFLUXDB_PASSWORD=interactws
             - INFLUXDB_HTTP_AUTH_ENABLED=true
-
-    

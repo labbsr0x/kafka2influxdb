@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/labbsr0x/kafka2influxdb/database/models"
@@ -19,18 +20,20 @@ import (
 
 type ConsumerController struct {
 	*config.WebBuilder
-	service *services.ConsumerService
+	service      *services.ConsumerService
+	kafkaService *services.KafkaService
 }
 
 func NewConsumerController(webBuilder *config.WebBuilder) *ConsumerController {
 	instance := new(ConsumerController)
 	instance.service = services.NewConsumerService(webBuilder)
+	instance.kafkaService = services.NewKafkaService(webBuilder)
 	return instance
 }
 
 // ListenHandler saves a single node on influxdb
-func (c *ConsumerController) ListenHandler(payload []byte) error {
-	data, err := getData(payload)
+func (c *ConsumerController) ListenHandler(topic string, payload []byte) error {
+	data, err := c.getData(topic, payload)
 	if err != nil {
 		logrus.Errorf("Error binding JSON: %s", err)
 		return fmt.Errorf("Error binding JSON: %s", err)
@@ -124,7 +127,7 @@ func getDateTime(node map[string]string) (error, time.Time) {
 	return nil, dateTime
 }
 
-func getData(payload []byte) (data *models.Data, err error) {
+func (c *ConsumerController) getData(topic string, payload []byte) (data *models.Data, err error) {
 	var schema avro.Schema
 	var dateTime time.Time
 	record := models.Schema{}
@@ -171,10 +174,13 @@ func getData(payload []byte) (data *models.Data, err error) {
 	}
 	keys := rg.FindStringSubmatch(record.Key)
 
+	schemaId, _ := c.getSchemaId(topic)
+
 	data.Tags = map[string]string{
-		"owner": keys[1],
-		"thing": keys[2],
-		"node":  keys[3],
+		"owner":  keys[1],
+		"thing":  keys[2],
+		"node":   keys[3],
+		"schema": strconv.FormatInt(schemaId, 10),
 	}
 
 	data.Fields = map[string]string{
@@ -182,6 +188,16 @@ func getData(payload []byte) (data *models.Data, err error) {
 		"lon":  record.Value.Lon,
 		"mci":  record.Value.Mci,
 		"type": record.Value.Type,
+	}
+
+	return
+}
+
+func (c *ConsumerController) getSchemaId(topic string) (schemaID int64, err error) {
+	schemaID, err = c.kafkaService.GetSchemaID(topic)
+	if err != nil {
+		logrus.Errorf("Error recovering schema id: %s", err)
+		return
 	}
 
 	return

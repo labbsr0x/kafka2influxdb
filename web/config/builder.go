@@ -11,6 +11,7 @@ import (
 const (
 	kafkaAddr           = "kafka-addr"
 	kafkaTopic          = "kafka-topic"
+	kafkaSchemaRegistry = "kafka-schema-registry"
 	influxdbAddr        = "influxdb-addr"
 	influxdbName        = "influxdb-name"
 	influxdbUser        = "influxdb-user"
@@ -29,6 +30,7 @@ const (
 type Flags struct {
 	KafkaAddr           string
 	KafkaTopic          string
+	KafkaSchemaRegistry string
 	InfluxdbName        string
 	InfluxdbAddr        string
 	InfluxdbUser        string
@@ -52,18 +54,19 @@ type WebBuilder struct {
 func AddFlags(flags *pflag.FlagSet) {
 	flags.StringP(kafkaAddr, "k", "", "Kafka URL")
 	flags.StringP(kafkaTopic, "t", "/owner/*", "Kafka's topic")
+	flags.StringP(kafkaSchemaRegistry, "e", "", "Kafka's schema registry")
 	flags.StringP(influxdbAddr, "i", "", "InfluxDB URL")
 	flags.StringP(influxdbName, "n", "interactws", "[optional] Sets the InfluxDB's name. Default: 'interactws'")
 	flags.StringP(influxdbUser, "u", "", "Sets the InfluxDB's user")
 	flags.StringP(influxdbPassword, "s", "", "Sets the InfluxDB's password")
-	flags.StringP(port, "p", "7070", "[optional] Custom port for accessing Kafka2InfluxDB's services. Defaults to 7070")
-	flags.StringP(logLevel, "l", "info", "[optional] Sets the Log Level to one of seven (trace, debug, info, warn, error, fatal, panic). Defaults to info")
+	flags.StringP(port, "p", "7070", "[optional] Custom port for accessing Kafka2InfluxDB's services. Default: 7070")
+	flags.StringP(logLevel, "l", "info", "[optional] Sets the Log Level to one of seven (trace, debug, info, warn, error, fatal, panic). Default: info")
 	flags.StringP(withSASL, "w", "false", "[optional] Enable/Disable SASL Kafka Security. Default: false")
-	flags.StringP(kerberosConfigPath, "c", "", "[optional] Kerberos Config")
-	flags.StringP(kerberosServiceName, "d", "", "[optional] Kerberos Config")
-	flags.StringP(kerberosUsername, "f", "", "[optional] Kerberos Config")
-	flags.StringP(kerberosPassword, "g", "", "[optional] Kerberos Config")
-	flags.StringP(kerberosRealm, "r", "", "[optional] Kerberos Config")
+	flags.StringP(kerberosConfigPath, "c", "", "Kerberos config path")
+	flags.StringP(kerberosServiceName, "d", "kafka", "[optional] Kerberos service name. Default: kafka")
+	flags.StringP(kerberosUsername, "f", "", "Kerberos user")
+	flags.StringP(kerberosPassword, "g", "", "Kerberos password")
+	flags.StringP(kerberosRealm, "r", "KERBEROS", "[optional] Kerberos realm. Default: KERBEROS")
 }
 
 // Init initializes the web server builder with properties retrieved from Viper.
@@ -71,6 +74,7 @@ func (b *WebBuilder) Init(v *viper.Viper) *WebBuilder {
 	flags := new(Flags)
 	flags.KafkaAddr = v.GetString(kafkaAddr)
 	flags.KafkaTopic = v.GetString(kafkaTopic)
+	flags.KafkaSchemaRegistry = v.GetString(kafkaSchemaRegistry)
 	flags.InfluxdbAddr = v.GetString(influxdbAddr)
 	flags.InfluxdbName = v.GetString(influxdbName)
 	flags.InfluxdbUser = v.GetString(influxdbUser)
@@ -99,6 +103,7 @@ func (flags *Flags) check() {
 	}{
 		{flags.KafkaAddr, kafkaAddr},
 		{flags.KafkaTopic, kafkaTopic},
+		{flags.KafkaSchemaRegistry, kafkaSchemaRegistry},
 		{flags.InfluxdbAddr, influxdbAddr},
 		{flags.InfluxdbUser, influxdbUser},
 		{flags.InfluxdbPassword, influxdbPassword},

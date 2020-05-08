@@ -128,7 +128,7 @@ func (dk *DefaultKafka) ListenGroup(handler func([]byte) error) {
 	logrus.Debugf("Processed %d messages", msgCount)
 }
 
-func (dk *DefaultKafka) consume(handler func([]byte) error) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError) {
+func (dk *DefaultKafka) consume(handler func(string, []byte) error) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError) {
 	consumers := make(chan *sarama.ConsumerMessage)
 	errors := make(chan *sarama.ConsumerError)
 	topics, _ := dk.Client.Topics()
@@ -153,7 +153,7 @@ func (dk *DefaultKafka) consume(handler func([]byte) error) (chan *sarama.Consum
 						case msg := <-consumer.Messages():
 							consumers <- msg
 							logrus.Debugf("Got message on topic (%s): %s", topic, msg.Value)
-							handler(msg.Value)
+							handler(topic, msg.Value)
 						}
 					}
 				}(topic, consumer)
