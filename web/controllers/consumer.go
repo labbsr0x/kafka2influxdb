@@ -1,12 +1,13 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/labbsr0x/kafka2influxdb/database/models"
@@ -33,8 +34,8 @@ func NewConsumerController(webBuilder *config.WebBuilder) *ConsumerController {
 }
 
 // ListenHandler saves a single node on influxdb
-func (c *ConsumerController) ListenHandler(topic string, payload []byte) error {
-	data, err := c.getData(topic, payload)
+func (c *ConsumerController) ListenHandler(key []byte, payload []byte) error {
+	data, err := c.getData(key, payload)
 	if err != nil {
 		logrus.Errorf("Error binding JSON: %s", err)
 		return fmt.Errorf("Error binding JSON: %s", err)
@@ -128,43 +129,76 @@ func getDateTime(node map[string]string) (error, time.Time) {
 	return nil, dateTime
 }
 
-func (c *ConsumerController) getData(topic string, payload []byte) (data *models.Data, err error) {
-	var schema avro.Schema
-	var dateTime time.Time
-	record := models.Schema{}
-	retry := true
+// https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format
+func (c *ConsumerController) getSchemaOfMessage(payload []byte) (string, string, error) {
+	var schemaID int32
+	logrus.Tracef("Payload Schema ID: %s", hex.EncodeToString(payload[1:5]))
+	buf := bytes.NewBuffer(payload[1:5])
+	binary.Read(buf, binary.BigEndian, &schemaID)
+	logrus.Debugf("SchemaID: %d\n", schemaID)
+	return c.kafkaService.LoadSchemaFromRegistry(schemaID)
+}
 
-	magicByte := payload[0]
-	schemaID := binary.LittleEndian.Uint32(payload[1:5])
-	msg := payload[5:]
+func (c *ConsumerController) decodeAvro(payload []byte, result interface{}) (string, error) {
+	schema, schemaName, err := c.getSchemaOfMessage(payload)
+	if err != nil {
+		logrus.Errorf("Cannot parse schemaKey: %s", err)
+		return "", fmt.Errorf("Cannot parse schemaKey: %s", err)
+	}
+	logrus.Tracef(schema)
 
-	schema, err = avro.Parse(models.SchemaModel)
+	//When using SchemaRegistry, the message comes with this pattern
+	// 0     : Magic byte
+	// 1-4   : 4 bytes Schema ID using BigEndian
+	// 5-... : Serialized data for the specified schema format
+	//https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format
+	msgPayload := payload[5:]
+	logrus.Debugf("msgPayload: %s", hex.EncodeToString(msgPayload))
+
+	schemaModel, err := avro.Parse(schema)
 	if err != nil {
 		logrus.Errorf("The schema could not be parsed: %v", err)
+		return schemaName, fmt.Errorf("The schema could not be parsed: %v", err)
 	}
-
-	err = avro.Unmarshal(schema, msg, &record)
+	err = avro.Unmarshal(schemaModel, msgPayload, result)
 	if err != nil {
-		err = json.Unmarshal(payload, &record) //Try decoding as json when avro fails
+		//Try decoding as json when avro fails
+		err = json.Unmarshal(payload, result)
 		if err != nil {
 			logrus.Errorf("The message could not be decoded: %v", err)
-			return
+			return schemaName, fmt.Errorf("The message could not be decoded: %v", err)
 		}
 	}
+	return schemaName, nil
+}
 
-	logrus.Debugf("Record parsed: %v", record)
+func (c *ConsumerController) getData(keyPayload []byte, messagePayload []byte) (data *models.Data, err error) {
+	var dateTime time.Time
 
-	for retry {
-		dateTime, err = time.Parse(time.RFC3339, record.Value.DateTime)
+	//Parse Key Payload
+	var messageKey string
+	_, err = c.decodeAvro(keyPayload, &messageKey)
+	if err != nil {
+		logrus.Errorf("Error decoding key payload: %s", err)
+		return
+	}
+	logrus.Debugf("Key parsed: %s", messageKey)
+
+	//Parse Message Payload
+	var message map[string]interface{}
+	messageSchemaName, err := c.decodeAvro(messagePayload, &message)
+	if err != nil {
+		logrus.Errorf("Error decoding message payload: %s", err)
+		return
+	}
+	logrus.Debugf("Record parsed: %s", message)
+
+	dateTime, err = time.Parse(time.RFC3339, message["dateTime"].(string))
+	if err != nil {
+		dateTime, err = time.Parse("2006-01-02T15:04:05Z0700", message["dateTime"].(string))
 		if err != nil {
-			err = json.Unmarshal(payload, &record) //Try decoding as json when couldn`t parse dateTime
-			if err != nil {
-				retry = false
-				logrus.Errorf("Error parsing dateTime attribute: %s", err)
-				return
-			}
-		} else {
-			retry = false
+			logrus.Errorf("Error on parse dateTime: %s", err)
+			return
 		}
 	}
 
@@ -172,27 +206,25 @@ func (c *ConsumerController) getData(topic string, payload []byte) (data *models
 	data.DateTime = dateTime
 
 	rg := regexp.MustCompile(`owner/(?P<Owner>\w+)/thing/(?P<Thing>\w+)/node/(?P<Node>\w+)`)
-	if !rg.MatchString(record.Key) {
-		err = fmt.Errorf("The keys doesn't matches with pattern (owner/:owner/thing/:thing/node/:node): %s", record.Key)
+	if !rg.MatchString(messageKey) {
+		err = fmt.Errorf("The keys doesn't matches with pattern (owner/:owner/thing/:thing/node/:node): %s", messageKey)
 		logrus.Errorf("Error on parsing tags: %s", err)
 		return
 	}
-	keys := rg.FindStringSubmatch(record.Key)
-
-	schemaId, _ := c.getSchemaId(topic)
+	keys := rg.FindStringSubmatch(messageKey)
 
 	data.Tags = map[string]string{
-		"owner":  keys[1],
-		"thing":  keys[2],
-		"node":   keys[3],
-		"schema": strconv.FormatInt(schemaId, 10),
+		"owner":    keys[1],
+		"thing":    keys[2],
+		"node":     keys[3],
+		"schema_0": messageSchemaName,
 	}
 
 	data.Fields = map[string]string{
-		"lat":  record.Value.Lat,
-		"lon":  record.Value.Lon,
-		"mci":  record.Value.Mci,
-		"type": record.Value.Type,
+		"lat":  message["lat"].(string),
+		"lon":  message["lon"].(string),
+		"mci":  message["mci"].(string),
+		"type": message["type"].(string),
 	}
 
 	return

@@ -36,6 +36,7 @@ func (s *Server) InitFromWebBuilder(webBuilder *config.WebBuilder) *Server {
 }
 
 func (s *Server) Run() {
+	logrus.Info("Version 0.0.1")
 	consumerGroup := s.app.Group("/")
 	{
 		consumerGroup.GET("/", index)

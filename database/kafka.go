@@ -90,7 +90,7 @@ func (dk *DefaultKafka) Connect() *DefaultKafka {
 }
 
 // Listen all messages from Kafka topic list
-func (dk *DefaultKafka) ListenGroup(handler func([]byte) error) {
+func (dk *DefaultKafka) ListenGroup(handler func([]byte, []byte) error) {
 	defer func() {
 		if err := dk.Client.Close(); err != nil {
 			logrus.Errorf("Error on closing connection: %v", err)
@@ -128,7 +128,7 @@ func (dk *DefaultKafka) ListenGroup(handler func([]byte) error) {
 	logrus.Debugf("Processed %d messages", msgCount)
 }
 
-func (dk *DefaultKafka) consume(handler func(string, []byte) error) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError) {
+func (dk *DefaultKafka) consume(handler func([]byte, []byte) error) (chan *sarama.ConsumerMessage, chan *sarama.ConsumerError) {
 	consumers := make(chan *sarama.ConsumerMessage)
 	errors := make(chan *sarama.ConsumerError)
 	topics, _ := dk.Client.Topics()
@@ -153,7 +153,7 @@ func (dk *DefaultKafka) consume(handler func(string, []byte) error) (chan *saram
 						case msg := <-consumer.Messages():
 							consumers <- msg
 							logrus.Debugf("Got message on topic (%s): %s", topic, msg.Value)
-							handler(topic, msg.Value)
+							handler(msg.Key, msg.Value)
 						}
 					}
 				}(topic, consumer)

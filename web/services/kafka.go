@@ -48,9 +48,34 @@ func (s *KafkaService) GetSchemaID(topicName string) (int64, error) {
 	return schemaID, nil
 }
 
+//LoadSchemaFromRegistry .
+func (s *KafkaService) LoadSchemaFromRegistry(schemaID int32) (string, string, error) {
+	url := fmt.Sprintf("%s/schemas/ids/%d", s.schemaRegistry, schemaID)
+	res, err := doGet([]byte(url), "application/json")
+	if err != nil {
+		logrus.Errorf("Error at GetSchema ID %d: %s", schemaID, err)
+		return "", "", err
+	}
+	body := res.Body()
+	if res.StatusCode() == fasthttp.StatusOK {
+		var response map[string]interface{}
+		_ = json.Unmarshal([]byte(body), &response)
+		logrus.Infof("Response: %s", response)
+		schemaModel, found := response["schema"]
+		if found {
+			err = json.Unmarshal([]byte(schemaModel.(string)), &response)
+			if err != nil {
+				return fmt.Sprintf("{ \"type\": %s }", schemaModel), "", nil
+			}
+		}
+		return schemaModel.(string), response["name"].(string), nil
+	}
+	return "", "", fmt.Errorf("Error on aquire Schema ID %d", schemaID)
+}
+
 //doGet do a http get request.
 func doGet(url []byte, contentType string) (*fasthttp.Response, error) {
-	logrus.Tracef("URL: %s\n", string(url))
+	logrus.Infof("URL: %s", string(url))
 	req := fasthttp.AcquireRequest()
 	req.Header.SetMethodBytes([]byte("GET"))
 	req.Header.SetContentType(contentType)

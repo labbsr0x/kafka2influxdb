@@ -49,7 +49,7 @@ services:
         SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
 
   kafka2influxdb:
-    image: labbsr0x/kafka2influxdb
+    image: labbsr0x/kafka2influxdb:0.0.3
     build: .
     restart: always
     depends_on:
