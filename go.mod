@@ -9,7 +9,7 @@ require (
 	github.com/hamba/avro v1.0.0
 	github.com/huandu/go-sqlbuilder v1.7.0
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
-	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/jarcoal/httpmock v1.0.5 // indirect
 	github.com/pelletier/go-toml v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/afero v1.2.2 // indirect
@@ -18,5 +18,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.3
 	github.com/valyala/fasthttp v1.12.0
+	github.com/wailsapp/wails v1.5.0 // indirect
 	gopkg.in/jcmturner/goidentity.v3 v3.0.0 // indirect
 )

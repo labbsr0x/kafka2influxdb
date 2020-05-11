@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,8 +42,8 @@ func (c *ConsumerController) ListenHandler(topic string, payload []byte) error {
 
 	_, servErr := c.service.CreatePoint(data)
 	if !servErr.Ok() {
-		logrus.Errorf("Error saving point: %s", servErr)
-		return fmt.Errorf("Error saving point: %s", servErr)
+		logrus.Errorf("Error saving point: %v", servErr)
+		return fmt.Errorf("Error saving point: %v", servErr)
 	}
 
 	return nil
@@ -73,7 +74,7 @@ func (c *ConsumerController) CreateHandler(ctx *gin.Context) {
 		data.Fields = json
 		_, servErr := c.service.CreatePoint(data)
 		if !servErr.Ok() {
-			ctx.String(servErr.SetStatusCode(), fmt.Sprintf("Error saving point: %s", servErr))
+			ctx.String(servErr.SetStatusCode(), fmt.Sprintf("Error saving point: %v", servErr))
 			return
 		}
 	}
@@ -100,8 +101,8 @@ func (c *ConsumerController) GetHandler(ctx *gin.Context) {
 
 	points, servErr := c.service.GetPoints(data)
 	if !servErr.Ok() {
-		logrus.Errorf("%s", servErr)
-		ctx.String(http.StatusBadRequest, fmt.Sprintf("Error getting data: %s", servErr))
+		logrus.Errorf("%v", servErr)
+		ctx.String(http.StatusBadRequest, fmt.Sprintf("Error getting data: %v", servErr))
 		return
 	}
 
@@ -133,12 +134,16 @@ func (c *ConsumerController) getData(topic string, payload []byte) (data *models
 	record := models.Schema{}
 	retry := true
 
+	magicByte := payload[0]
+	schemaID := binary.LittleEndian.Uint32(payload[1:5])
+	msg := payload[5:]
+
 	schema, err = avro.Parse(models.SchemaModel)
 	if err != nil {
 		logrus.Errorf("The schema could not be parsed: %v", err)
 	}
 
-	err = avro.Unmarshal(schema, payload, &record)
+	err = avro.Unmarshal(schema, msg, &record)
 	if err != nil {
 		err = json.Unmarshal(payload, &record) //Try decoding as json when avro fails
 		if err != nil {

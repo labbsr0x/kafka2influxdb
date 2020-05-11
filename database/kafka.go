@@ -59,7 +59,7 @@ func (dk *DefaultKafka) Connect() *DefaultKafka {
 
 	//Check if SASL is enabled
 	if dk.WithSASL {
-		config.Version = sarama.V2_3_0_0
+		config.Version = sarama.V2_0_0_0
 		config.Net.SASL.Enable = dk.WithSASL
 		config.Net.SASL.Handshake = true
 		config.Net.SASL.Mechanism = sarama.SASLTypeGSSAPI
